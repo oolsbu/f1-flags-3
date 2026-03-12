@@ -222,8 +222,10 @@ const handleRC = (
   if (events.length === 0) return;
 
   if (opts?.snapshot) {
+    // The snapshot is a state-sync, not a live event — bypass the delay
+    // buffer and show the latest known flag immediately.
     buffer = [];
-    enqueueFlagEvent(events[events.length - 1]);
+    onFlag?.(events[events.length - 1].flag);
     return;
   }
 
