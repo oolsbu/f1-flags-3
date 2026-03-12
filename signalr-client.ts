@@ -18,6 +18,26 @@ let onFlag: FlagCallback | null = null;
 let dispatchTimer: ReturnType<typeof setInterval> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
+const getEventUtcMs = (value: unknown): number => {
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return Date.now();
+};
+
+const enqueueFlagEvent = (event: BufferedEvent) => {
+  const last = buffer[buffer.length - 1];
+  if (last && last.flag === event.flag && last.utcMs === event.utcMs) {
+    return;
+  }
+
+  buffer.push(event);
+  console.log(
+    `[SignalR] Buffered flag=${event.flag} utc=${new Date(event.utcMs).toISOString()} delay=${delayMs}ms`,
+  );
+};
+
 const flagNameToNumber = (flag?: string, message?: string): number | null => {
   const msg = (message ?? "").toUpperCase();
   const f = (flag ?? "").toUpperCase();
@@ -118,8 +138,11 @@ const openSocket = async () => {
           }
         }
 
-        // Initial state / invoke result
-        if (pkt.R?.RaceControlMessages) handleRC(pkt.R.RaceControlMessages);
+        // Initial state / invoke result should only seed the latest live flag,
+        // not replay the whole historical race-control timeline on connect.
+        if (pkt.R?.RaceControlMessages) {
+          handleRC(pkt.R.RaceControlMessages, { snapshot: true });
+        }
       } catch {
         /* keepalive / non-JSON frame */
       }
@@ -165,7 +188,10 @@ const openSocket = async () => {
 
 /* ──────────────────── Race-control message handling ──────────────────── */
 
-const handleRC = (data: Record<string, unknown>) => {
+const handleRC = (
+  data: Record<string, unknown>,
+  opts?: { snapshot?: boolean },
+) => {
   let msgs: Record<string, unknown>[] = [];
 
   if (Array.isArray((data as { Messages?: unknown[] }).Messages)) {
@@ -177,18 +203,32 @@ const handleRC = (data: Record<string, unknown>) => {
     );
   }
 
-  for (const m of msgs) {
-    const flag = flagNameToNumber(
-      m.Flag as string | undefined,
-      m.Message as string | undefined,
-    );
-    if (flag === null) continue;
+  const events = msgs
+    .map((m) => {
+      const flag = flagNameToNumber(
+        m.Flag as string | undefined,
+        m.Message as string | undefined,
+      );
+      if (flag === null) return null;
 
-    const utcMs = m.Utc ? new Date(m.Utc as string).getTime() : Date.now();
-    buffer.push({ utcMs, flag });
-    console.log(
-      `[SignalR] Buffered flag=${flag} utc=${new Date(utcMs).toISOString()} delay=${delayMs}ms`,
-    );
+      return {
+        flag,
+        utcMs: getEventUtcMs(m.Utc),
+      } satisfies BufferedEvent;
+    })
+    .filter((event): event is BufferedEvent => event !== null)
+    .sort((a, b) => a.utcMs - b.utcMs);
+
+  if (events.length === 0) return;
+
+  if (opts?.snapshot) {
+    buffer = [];
+    enqueueFlagEvent(events[events.length - 1]);
+    return;
+  }
+
+  for (const event of events) {
+    enqueueFlagEvent(event);
   }
 };
 

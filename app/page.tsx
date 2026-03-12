@@ -75,9 +75,9 @@ const readSettings = (): PersistedSettings => {
 const FLAG_COLORS: Record<number, string> = {
   1: "#00c853", // green
   2: "#ffea00", // yellow
-  3: "#ff1744", // red
+  3: "#ff0000", // red
   4: "#ff9100", // safety car (orange)
-  5: "#e040fb", // vsc (purple)
+  5: "#ff9100", // vsc shown without purple
 };
 
 const flagLabel = (flag: number) => {
@@ -212,7 +212,9 @@ const Page = () => {
       }
 
       if (typeof status.liveDelayMs === "number") {
-        setBroadcastDelaySec(Math.max(0, Math.round(status.liveDelayMs / 1000)));
+        setBroadcastDelaySec(
+          Math.max(0, Math.round(status.liveDelayMs / 1000)),
+        );
       }
 
       if (status.mode === "replay") {
@@ -248,7 +250,9 @@ const Page = () => {
         if (saved.lastMode === "replay") {
           startReplayPoller({
             sessionKey: saved.selectedSessionKey,
-            replayDurationMs: saved.realtime ? 0 : saved.replayDurationSec * 1000,
+            replayDurationMs: saved.realtime
+              ? 0
+              : saved.replayDurationSec * 1000,
             liveDelayMs: saved.broadcastDelaySec * 1000,
           });
           return;

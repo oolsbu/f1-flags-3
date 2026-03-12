@@ -10,9 +10,9 @@ const COLOR_OFF = 0x000000;
 const COLOR_WHITE = 0xffffff;
 const COLOR_GREEN = 0x00c853;
 const COLOR_YELLOW = 0xffea00;
-const COLOR_RED = 0xff1744;
+const COLOR_RED = 0xff0000;
 const COLOR_ORANGE = 0xff9100;
-const COLOR_VSC = 0xe040fb;
+const COLOR_VSC = COLOR_ORANGE;
 
 // ---------------------------------------------------------------------------
 // Types
